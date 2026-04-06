@@ -20,13 +20,13 @@ A plugin for [Optimizely CMS](https://www.optimizely.com/products/content-manage
 
 Install from NuGet:
 
-```shell
+```shell wrap
 dotnet add package TuyenPham.SiteSettings
 ```
 
 Register the service in your `Startup.cs` or `Program.cs`:
 
-```csharp
+```csharp wrap
 using TuyenPham.SiteSettings.DependencyInjection;
 
 services.AddSiteSettings();
@@ -46,12 +46,19 @@ using TuyenPham.SiteSettings.Models;
 [SettingsContentType(
     DisplayName = "General Settings",
     GUID = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")]
-public class GeneralSettings : SettingsBase
+public class GeneralSettings
+    : SettingsBase
 {
-    [Display(Name = "Site Title", GroupName = SystemTabNames.Content, Order = 10)]
+    [Display(
+        Name = "Site Title",
+        GroupName = SystemTabNames.Content,
+        Order = 10)]
     public virtual string? SiteTitle { get; set; }
 
-    [Display(Name = "Footer Text", GroupName = SystemTabNames.Content, Order = 20)]
+    [Display(
+        Name = "Footer Text",
+        GroupName = SystemTabNames.Content,
+        Order = 20)]
     public virtual string? FooterText { get; set; }
 }
 ```
@@ -65,12 +72,18 @@ Inject `ISiteSettingsService` and call `GetSiteSettings<T>()`:
 ```csharp
 using TuyenPham.SiteSettings.Services;
 
-public class MyController(ISiteSettingsService settingsService) : Controller
+public class MyController(
+    ISiteSettingsService settingsService)
+     : Controller
 {
     public IActionResult Index()
     {
-        var settings = settingsService.GetSiteSettings<GeneralSettings>();
-        // settings?.SiteTitle, settings?.FooterText, etc.
+        var settings = settingsService
+        .GetSiteSettings<GeneralSettings>();
+
+        // settings?.SiteTitle,
+        // settings?.FooterText,
+        // etc.
         return View(settings);
     }
 }
@@ -115,13 +128,13 @@ TuyenPham.SiteSettings/
 
 The test project uses [xUnit v3](https://xunit.net/) and [NSubstitute](https://nsubstitute.github.io/) for mocking.
 
-```shell
+```shell wrap
 dotnet run --project TuyenPham.SiteSettings.Tests
 ```
 
 ## Building the NuGet package
 
-```shell
+```shell wrap
 dotnet pack --configuration Release --output ./nupkg
 ```
 
