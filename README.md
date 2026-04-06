@@ -1,6 +1,6 @@
 # TuyenPham.SiteSettings
 
-A plugin for [Optimizely CMS](https://www.optimizely.com/products/cms/) that adds per-site settings management directly in the CMS editor UI. Define strongly-typed settings content types and retrieve them in code with full multi-language and multi-site support.
+A plugin for [Optimizely CMS](https://www.optimizely.com/products/content-management/) that adds per-site settings management directly in the CMS editor UI. Define strongly-typed settings content types and retrieve them in code with full multi-language and multi-site support.
 
 ## Features
 
