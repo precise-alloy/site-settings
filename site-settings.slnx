@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="TuyenPham.SiteSettings/TuyenPham.SiteSettings.csproj" />
+  <Project Path="TuyenPham.SiteSettings.Tests/TuyenPham.SiteSettings.Tests.csproj" />
+</Solution>
