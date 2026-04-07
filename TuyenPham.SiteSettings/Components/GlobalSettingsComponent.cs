@@ -20,11 +20,15 @@ public sealed class GlobalSettingsComponent
     public GlobalSettingsComponent()
         : base("epi-cms/component/MainNavigationComponent")
     {
+        var repositoryKeySeting = new Setting(
+            "repositoryKey",
+            GlobalSettingsRepositoryDescriptor.RepositoryKey);
+
         LanguagePath = "/episerver/cms/components/globalsettings";
         Title = "Site Settings";
         SortOrder = 1000;
         PlugInAreas = [PlugInArea.AssetsDefaultGroup];
-        Settings.Add(new Setting("repositoryKey", value: GlobalSettingsRepositoryDescriptor.RepositoryKey));
+        Settings.Add(repositoryKeySeting);
     }
 }
 

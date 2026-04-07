@@ -1,11 +1,7 @@
 using EPiServer.Cms.Shell.UI.CompositeViews.Internal;
-using EPiServer.Core;
-using EPiServer.Shell;
 using TuyenPham.SiteSettings.Descriptors;
 using TuyenPham.SiteSettings.Models;
 using TuyenPham.SiteSettings.Providers;
-using TuyenPham.SiteSettings.Services;
-using NSubstitute;
 
 namespace TuyenPham.SiteSettings.Tests.Descriptors;
 
@@ -89,7 +85,7 @@ public class GlobalSettingsRepositoryDescriptorTests
     {
         var descriptor = new GlobalSettingsRepositoryDescriptor();
 
-        // The Injected<ISiteSettingsService> dependency cannot be resolved without DI,
+        // The Injected<ISettingsService> dependency cannot be resolved without DI,
         // so we expect it to throw. This verifies the property accesses the injected service.
         Assert.ThrowsAny<Exception>(() => descriptor.Roots.ToList());
     }

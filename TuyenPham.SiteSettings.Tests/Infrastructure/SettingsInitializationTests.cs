@@ -1,5 +1,4 @@
 using EPiServer.Framework;
-using EPiServer.Framework.Initialization;
 using EPiServer.ServiceLocation;
 using TuyenPham.SiteSettings.Infrastructure;
 

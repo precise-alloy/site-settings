@@ -1,9 +1,8 @@
 using NSubstitute;
-using TuyenPham.SiteSettings.Services;
 
 namespace TuyenPham.SiteSettings.Tests.Services;
 
-public class SiteSettingsServiceClearCacheTests : SiteSettingsServiceTestBase
+public class SettingsServiceClearCacheTests : SettingsServiceTestBase
 {
     [Fact]
     public void ClearCache_RemovesMasterCacheKey()

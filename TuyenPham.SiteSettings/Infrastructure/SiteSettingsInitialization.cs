@@ -6,7 +6,7 @@ namespace TuyenPham.SiteSettings.Infrastructure;
 
 /// <summary>
 /// Optimizely CMS initialization module that bootstraps the site settings infrastructure.
-/// Registers the <see cref="ISiteSettingsService"/> initialization on the <c>InitComplete</c> event.
+/// Registers the <see cref="ISettingsService"/> initialization on the <c>InitComplete</c> event.
 /// </summary>
 [ModuleDependency(typeof(EPiServer.Web.InitializationModule))]
 // ReSharper disable once UnusedMember.Global
@@ -22,7 +22,7 @@ public class SettingsInitialization
     }
 
     /// <summary>
-    /// Subscribes to the <c>InitComplete</c> event to trigger <see cref="ISiteSettingsService.InitializeSettings"/>
+    /// Subscribes to the <c>InitComplete</c> event to trigger <see cref="ISettingsService.InitializeSettings"/>
     /// once all CMS modules have finished initializing.
     /// </summary>
     /// <param name="context">The initialization engine providing access to the service locator.</param>
@@ -31,7 +31,7 @@ public class SettingsInitialization
         context.InitComplete += (_, _) =>
         {
             context.Services
-                .GetInstance<ISiteSettingsService>()
+                .GetInstance<ISettingsService>()
                 .InitializeSettings();
         };
     }

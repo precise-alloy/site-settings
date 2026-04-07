@@ -6,7 +6,7 @@ namespace TuyenPham.SiteSettings.Services;
 /// <summary>
 /// Provides site-level settings management including initialization, retrieval, and site lifecycle handling.
 /// </summary>
-public interface ISiteSettingsService
+public interface ISettingsService
 {
     /// <summary>
     /// Gets the <see cref="ContentReference"/> to the global settings root folder.

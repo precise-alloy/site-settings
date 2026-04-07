@@ -1,13 +1,11 @@
-using EPiServer;
 using EPiServer.Applications;
 using EPiServer.Core;
-using EPiServer.DataAbstraction;
 using NSubstitute;
 using TuyenPham.SiteSettings.Models;
 
 namespace TuyenPham.SiteSettings.Tests.Services;
 
-public class SiteSettingsServiceSiteTests : SiteSettingsServiceTestBase
+public class SettingsServiceSiteTests : SettingsServiceTestBase
 {
     #region SiteCreated
 

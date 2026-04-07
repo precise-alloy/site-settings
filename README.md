@@ -67,13 +67,13 @@ A settings instance is automatically created for each site when the site is firs
 
 ### 2. Retrieve settings in code
 
-Inject `ISiteSettingsService` and call `GetSiteSettings<T>()`:
+Inject `ISettingsService` and call `GetSiteSettings<T>()`:
 
 ```csharp
 using TuyenPham.SiteSettings.Services;
 
 public class MyController(
-    ISiteSettingsService settingsService)
+    ISettingsService settingsService)
      : Controller
 {
     public IActionResult Index()
@@ -120,7 +120,7 @@ TuyenPham.SiteSettings/
 ├── Infrastructure/      # CMS initialization module
 ├── Models/              # SettingsBase, SettingsContentTypeAttribute, SettingsFolder
 ├── Providers/           # Global search provider
-├── Services/            # ISiteSettingsService and SiteSettingsService
+├── Services/            # ISettingsService and SettingsService
 └── ClientResources/     # Client-side assets (styles)
 ```
 

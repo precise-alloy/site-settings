@@ -1,6 +1,5 @@
 using EPiServer;
 using EPiServer.Applications;
-using EPiServer.Cms.Shell;
 using EPiServer.Core;
 using EPiServer.DataAbstraction;
 using EPiServer.Framework.Cache;
@@ -9,12 +8,11 @@ using EPiServer.Web;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using TuyenPham.SiteSettings.Models;
 using TuyenPham.SiteSettings.Services;
 
 namespace TuyenPham.SiteSettings.Tests.Services;
 
-public class SiteSettingsServiceTestBase
+public class SettingsServiceTestBase
 {
     protected readonly IContentEvents ContentEvents = Substitute.For<IContentEvents>();
     protected readonly IContentLanguageSettingsHandler ContentLanguageSettingsHandler = Substitute.For<IContentLanguageSettingsHandler>();
@@ -23,13 +21,13 @@ public class SiteSettingsServiceTestBase
     protected readonly IContentVersionRepository ContentVersionRepository = Substitute.For<IContentVersionRepository>();
     protected readonly IContextModeResolver ContextModeResolver = Substitute.For<IContextModeResolver>();
     protected readonly IHttpContextAccessor HttpContextAccessor = Substitute.For<IHttpContextAccessor>();
-    protected readonly ILogger<SiteSettingsService> Logger = Substitute.For<ILogger<SiteSettingsService>>();
+    protected readonly ILogger<SettingsService> Logger = Substitute.For<ILogger<SettingsService>>();
     protected readonly IApplicationRepository ApplicationRepository = Substitute.For<IApplicationRepository>();
     protected readonly ISynchronizedObjectInstanceCache CacheManager = Substitute.For<ISynchronizedObjectInstanceCache>();
     protected readonly ITypeScannerLookup TypeScannerLookup = Substitute.For<ITypeScannerLookup>();
     protected readonly ContentRootService ContentRootService = Substitute.For<ContentRootService>();
 
-    protected SiteSettingsService CreateService() =>
+    protected SettingsService CreateService() =>
         new(
             ContentEvents,
             ContentLanguageSettingsHandler,

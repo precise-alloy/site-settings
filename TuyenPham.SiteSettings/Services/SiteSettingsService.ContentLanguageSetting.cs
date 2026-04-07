@@ -2,7 +2,7 @@ using TuyenPham.SiteSettings.Models;
 
 namespace TuyenPham.SiteSettings.Services;
 
-public partial class SiteSettingsService
+public partial class SettingsService
 {
     /// <summary>
     /// Handles language setting saved or deleted events. Clears the entire settings cache when

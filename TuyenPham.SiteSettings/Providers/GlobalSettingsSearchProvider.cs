@@ -25,7 +25,7 @@ public class GlobalSettingsSearchProvider(
     IUrlResolver urlResolver,
     UIDescriptorRegistry uiDescriptorRegistry,
     IContentLoader contentLoader,
-    ISiteSettingsService settingsService)
+    ISettingsService settingsService)
     : ContentSearchProviderBase<SettingsBase, ContentType>(
         localizationService,
         siteDefinitionResolver,

@@ -1,6 +1,5 @@
 using EPiServer;
 using EPiServer.Applications;
-using EPiServer.Cms.Shell.Search;
 using EPiServer.Core;
 using EPiServer.DataAbstraction;
 using EPiServer.Framework.Localization;
@@ -24,7 +23,7 @@ public class GlobalSettingsSearchProviderTests
     private readonly IUrlResolver _urlResolver = Substitute.For<IUrlResolver>();
     private readonly UIDescriptorRegistry _uiDescriptorRegistry;
     private readonly IContentLoader _contentLoader = Substitute.For<IContentLoader>();
-    private readonly ISiteSettingsService _settingsService = Substitute.For<ISiteSettingsService>();
+    private readonly ISettingsService _settingsService = Substitute.For<ISettingsService>();
 
     public GlobalSettingsSearchProviderTests()
     {

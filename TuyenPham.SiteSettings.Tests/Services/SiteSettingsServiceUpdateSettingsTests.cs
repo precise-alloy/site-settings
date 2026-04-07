@@ -1,4 +1,3 @@
-using EPiServer;
 using EPiServer.Core;
 using EPiServer.DataAbstraction;
 using NSubstitute;
@@ -6,7 +5,7 @@ using TuyenPham.SiteSettings.Models;
 
 namespace TuyenPham.SiteSettings.Tests.Services;
 
-public class SiteSettingsServiceUpdateSettingsTests : SiteSettingsServiceTestBase
+public class SettingsServiceUpdateSettingsTests : SettingsServiceTestBase
 {
     [Fact]
     public void UpdateSettings_WhenRootIsNull_LogsWarningAndReturns()

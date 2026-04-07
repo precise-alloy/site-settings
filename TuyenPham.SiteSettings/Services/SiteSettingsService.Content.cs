@@ -4,7 +4,7 @@ using TuyenPham.SiteSettings.Models;
 
 namespace TuyenPham.SiteSettings.Services;
 
-public partial class SiteSettingsService
+public partial class SettingsService
 {
     /// <summary>
     /// Handles the content saved event. Updates the draft cache for the saved settings content

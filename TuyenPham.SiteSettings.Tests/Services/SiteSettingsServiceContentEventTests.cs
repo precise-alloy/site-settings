@@ -7,7 +7,7 @@ using TuyenPham.SiteSettings.Services;
 
 namespace TuyenPham.SiteSettings.Tests.Services;
 
-public class SiteSettingsServiceContentEventTests : SiteSettingsServiceTestBase
+public class SettingsServiceContentEventTests : SettingsServiceTestBase
 {
     #region PublishedContent (via InitializeSettings event wiring)
 
@@ -89,7 +89,7 @@ public class SiteSettingsServiceContentEventTests : SiteSettingsServiceTestBase
 
     #endregion
 
-    private void SetupEmptySettingsRoot(SiteSettingsService service)
+    private void SetupEmptySettingsRoot(SettingsService service)
     {
         ContentRootService.List().Returns([]);
         ContentRepository

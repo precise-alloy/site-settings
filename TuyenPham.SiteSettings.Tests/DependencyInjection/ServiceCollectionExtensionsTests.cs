@@ -7,27 +7,27 @@ namespace TuyenPham.SiteSettings.Tests.DependencyInjection;
 public class ServiceCollectionExtensionsTests
 {
     [Fact]
-    public void AddSiteSettings_RegistersISiteSettingsServiceAsSingleton()
+    public void AddSiteSettings_RegistersISettingsServiceAsSingleton()
     {
         var services = new ServiceCollection();
 
         services.AddSiteSettings();
 
-        var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ISiteSettingsService));
+        var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ISettingsService));
         Assert.NotNull(descriptor);
         Assert.Equal(ServiceLifetime.Singleton, descriptor.Lifetime);
     }
 
     [Fact]
-    public void AddSiteSettings_RegistersSiteSettingsServiceAsImplementation()
+    public void AddSiteSettings_RegistersSettingsServiceAsImplementation()
     {
         var services = new ServiceCollection();
 
         services.AddSiteSettings();
 
-        var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ISiteSettingsService));
+        var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ISettingsService));
         Assert.NotNull(descriptor);
-        Assert.Equal(typeof(SiteSettingsService), descriptor.ImplementationType);
+        Assert.Equal(typeof(SettingsService), descriptor.ImplementationType);
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public class ServiceCollectionExtensionsTests
         services.AddSiteSettings();
         services.AddSiteSettings();
 
-        var descriptors = services.Where(d => d.ServiceType == typeof(ISiteSettingsService)).ToList();
+        var descriptors = services.Where(d => d.ServiceType == typeof(ISettingsService)).ToList();
         Assert.Equal(2, descriptors.Count);
     }
 }

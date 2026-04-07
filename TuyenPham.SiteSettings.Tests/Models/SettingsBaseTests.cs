@@ -1,5 +1,4 @@
 using EPiServer.Core;
-using EPiServer.DataAnnotations;
 using TuyenPham.SiteSettings.Models;
 
 namespace TuyenPham.SiteSettings.Tests.Models;

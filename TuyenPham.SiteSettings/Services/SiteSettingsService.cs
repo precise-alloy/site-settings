@@ -19,7 +19,7 @@ namespace TuyenPham.SiteSettings.Services;
 /// Manages site settings content, including caching, initialization, and content event handling.
 /// Settings are cached per site, per content type, and per language, with separate caches for edit and published modes.
 /// </summary>
-public partial class SiteSettingsService(
+public partial class SettingsService(
     IContentEvents contentEvents,
     IContentLanguageSettingsHandler contentLanguageSettingsHandler,
     IContentRepository contentRepository,
@@ -27,12 +27,12 @@ public partial class SiteSettingsService(
     IContentVersionRepository contentVersionRepository,
     IContextModeResolver contextModeResolver,
     IHttpContextAccessor httpContextAccessor,
-    ILogger<SiteSettingsService> logger,
+    ILogger<SettingsService> logger,
     IApplicationRepository applicationRepository,
     ISynchronizedObjectInstanceCache cacheManager,
     ITypeScannerLookup typeScannerLookup,
     ContentRootService contentRootService)
-        : ISiteSettingsService
+        : ISettingsService
 {
     private const string SettingServicesMasterCacheKey = "TuyenPham-SiteSettings";
     private const string LanguageSettingsCacheKey = "TuyenPham-SiteSettings-LanguageSettings";
@@ -44,7 +44,7 @@ public partial class SiteSettingsService(
     private readonly IContentVersionRepository _contentVersionRepository = contentVersionRepository;
     private readonly IContextModeResolver _contextModeResolver = contextModeResolver;
     private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
-    private readonly ILogger<SiteSettingsService> _logger = logger;
+    private readonly ILogger<SettingsService> _logger = logger;
     private readonly IApplicationRepository _applicationRepository = applicationRepository;
     private readonly ISynchronizedObjectInstanceCache _cacheManager = cacheManager;
     private readonly ITypeScannerLookup _typeScannerLookup = typeScannerLookup;
@@ -79,9 +79,8 @@ public partial class SiteSettingsService(
     /// </summary>
     public void UpdateSettings()
     {
-        var root = _contentRepository.GetItems(
-                _contentRootService.List(),
-                new LoaderOptions())
+        var root = _contentRepository
+            .GetItems(_contentRootService.List(),[])
             .FirstOrDefault(x => x.ContentGuid == SettingsFolder.SettingsRootGuid);
 
         if (root == null)
@@ -95,6 +94,7 @@ public partial class SiteSettingsService(
         foreach (var site in _applicationRepository.List())
         {
             var folder = children.Find(x => x.Name.Equals(site.Name, StringComparison.InvariantCultureIgnoreCase));
+
             if (folder != null)
             {
                 var settingsTypes = new List<Type>();
@@ -104,7 +104,7 @@ public partial class SiteSettingsService(
                     var settingType = child.GetOriginalType();
                     if (settingsTypes.Contains(settingType))
                     {
-                        _logger.LogWarning($"[Settings] Setting of type {settingType.Name} for site {folder.Name} have more than one instance");
+                        _logger.LogWarning("[Settings] Setting of type {settingTypeName} for site {folderName} have more than one instance", settingType.Name, folder.Name);
                     }
                     else
                     {
@@ -212,11 +212,11 @@ public partial class SiteSettingsService(
         {
             InsertSettingToCache(siteId, type, false, new Dictionary<string, SettingsBase?>());
             InsertSettingToCache(siteId, type, true, new Dictionary<string, SettingsBase?>());
-            _logger.LogWarning($"[Settings] no setting available for type {type} in site {siteId}");
+            _logger.LogWarning("[Settings] no setting available for type {type} in site {siteId}", type, siteId);
         }
 
         return _cacheManager.Get(CreateCacheKey(siteId, type, isEditMod)) as Dictionary<string, SettingsBase?>
-               ?? new Dictionary<string, SettingsBase?>();
+               ?? [];
 
     }
 
@@ -320,7 +320,7 @@ public partial class SiteSettingsService(
                 TimeSpan.FromDays(30),
                 CacheTimeoutType.Absolute,
                 Enumerable.Empty<string>(),
-                new[] { SettingServicesMasterCacheKey }));
+                [SettingServicesMasterCacheKey]));
     }
 
     /// <summary>
@@ -379,14 +379,13 @@ public partial class SiteSettingsService(
                     TimeSpan.FromDays(30),
                     CacheTimeoutType.Absolute,
                     Enumerable.Empty<string>(),
-                    new[]
-                    {
+                    [
                         LanguageSettingsCacheKey
-                    }));
+                    ]));
         }
 
         return languageSettings.TryGetValue(language, out var fallBacks)
-            ? fallBacks.ToList() //Clone List<>
+            ? [.. fallBacks] //Clone List<>
             : [];
     }
 

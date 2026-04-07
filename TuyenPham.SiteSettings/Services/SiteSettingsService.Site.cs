@@ -8,7 +8,7 @@ using TuyenPham.SiteSettings.Models;
 
 namespace TuyenPham.SiteSettings.Services;
 
-public partial class SiteSettingsService
+public partial class SettingsService
 {
     /// <summary>
     /// Resolves the current site identifier from the HTTP context using <see cref="EPiServer.Applications.IApplicationResolver"/>.
