@@ -6,12 +6,12 @@
 
     <!-- NuGet package metadata -->
     <PackageId>TuyenPham.SiteSettings</PackageId>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <Title>Site Settings</Title>
     <Authors>Tuyen Pham</Authors>
     <Description>Plugin to add site settings in Optimizely.</Description>
     <PackageProjectUrl>https://github.com/precise-alloy/site-settings</PackageProjectUrl>
-    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>Optimizely Site Settings</PackageTags>
     <Copyright>Copyright 2026</Copyright>
@@ -35,7 +35,6 @@
 
   <!-- Include zip as contentFiles in NuGet package -->
   <ItemGroup>
-    <None Include="..\LICENSE.txt" Pack="true" PackagePath="\" />
     <None Include="..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 

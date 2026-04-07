@@ -18,7 +18,7 @@ A plugin for [Optimizely CMS](https://www.optimizely.com/products/content-manage
 
 ## Installation
 
-Install from NuGet:
+Install from [Microsoft NuGet](https://www.nuget.org/packages/TuyenPham.SiteSettings) or [Optimizely Nuget](https://nuget.optimizely.com/packages/tuyenpham.sitesettings):
 
 ```shell wrap
 dotnet add package TuyenPham.SiteSettings
