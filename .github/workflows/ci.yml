@@ -32,16 +32,25 @@ jobs:
       - name: Test
         run: dotnet run --project TuyenPham.SiteSettings.Tests --no-build
 
-      # Get a short-lived NuGet API key
+      - name: Pack the package
+        run: dotnet pack --configuration Release --output ./artifacts
+
+      - name: Upload NuGet package
+        uses: actions/upload-artifact@v4
+        with:
+          name: TuyenPham.SiteSettings-nupkg
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+          retention-days: 30
+
+      # Publish only release-branch pushes; pull requests still expose the package artifact.
       - name: NuGet login (OIDC → temp API key)
+        if: github.event_name == 'push'
         uses: NuGet/login@v1
         id: login
         with:
           user: ${{ secrets.NUGET_USER }}
 
-      - name: Pack the package
-        run: dotnet pack --configuration Release --output ./artifacts
-
-      # Push the package
       - name: NuGet push
+        if: github.event_name == 'push'
         run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json
