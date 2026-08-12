@@ -13,6 +13,8 @@ namespace TuyenPham.SiteSettings.Infrastructure;
 public class SettingsInitialization
     : IConfigurableModule
 {
+    private EventHandler? _initCompleteHandler;
+
     /// <summary>
     /// Configures the dependency injection container. No additional registrations are performed here.
     /// </summary>
@@ -28,20 +30,34 @@ public class SettingsInitialization
     /// <param name="context">The initialization engine providing access to the service locator.</param>
     void IInitializableModule.Initialize(InitializationEngine context)
     {
-        context.InitComplete += (_, _) =>
+        ArgumentNullException.ThrowIfNull(context);
+
+        _initCompleteHandler = (_, _) =>
         {
             context.Services
                 .GetInstance<ISettingsService>()
                 .InitializeSettings();
         };
+        context.InitComplete += _initCompleteHandler;
     }
 
     /// <summary>
-    /// Performs cleanup when the module is uninitialized. No cleanup actions are required.
+    /// Removes initialization and content-event subscriptions during CMS shutdown.
     /// </summary>
     /// <param name="context">The initialization engine.</param>
     void IInitializableModule.Uninitialize(InitializationEngine context)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (_initCompleteHandler != null)
+        {
+            context.InitComplete -= _initCompleteHandler;
+            _initCompleteHandler = null;
+        }
+
+        context.Services
+            .GetInstance<ISettingsService>()
+            .UninitializeSettings();
     }
 
 }

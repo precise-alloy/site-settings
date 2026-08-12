@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using EPiServer;
 using EPiServer.Applications;
 using EPiServer.Cms.Shell.Search;
@@ -66,8 +67,14 @@ public class GlobalSettingsSearchProvider(
         var searchResultList = new List<SearchResult>();
         var str = query.SearchQuery.Trim();
 
+        if (settingsService.GlobalSettingsRoot is not { } root)
+        {
+            return [];
+        }
+
         var globalSettings = contentLoader
-            .GetChildren<SettingsBase>(settingsService.GlobalSettingsRoot);
+            .GetChildren<SettingsFolder>(root)
+            .SelectMany(folder => contentLoader.GetChildren<SettingsBase>(folder.ContentLink));
 
         foreach (var setting in globalSettings)
         {
@@ -91,11 +98,11 @@ public class GlobalSettingsSearchProvider(
     /// Creates preview text for a settings content item in search results.
     /// </summary>
     /// <param name="content">The content data to generate preview text for.</param>
-    /// <returns>A preview string combining the settings name and localized label, or empty if content is not <c>null</c>.</returns>
+    /// <returns>A preview string combining the settings name and localized label, or empty when content is not settings content.</returns>
     protected override string CreatePreviewText(IContentData? content)
     {
-        return content == null
-            ? $"{(content as SettingsBase)?.Name} {LocalizationService.GetString("/contentRepositories/globalsettings/customSelectTitle", "Settings").ToLower()}"
+        return content is SettingsBase settings
+            ? $"{settings.Name} {LocalizationService.GetString("/contentRepositories/globalsettings/customSelectTitle", "Settings").ToLowerInvariant()}"
             : string.Empty;
     }
 

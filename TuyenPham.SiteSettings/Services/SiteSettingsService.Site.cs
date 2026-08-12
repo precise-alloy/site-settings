@@ -2,7 +2,6 @@
 using EPiServer.Applications;
 using EPiServer.DataAccess;
 using EPiServer.Security;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TuyenPham.SiteSettings.Models;
 
@@ -11,48 +10,43 @@ namespace TuyenPham.SiteSettings.Services;
 public partial class SettingsService
 {
     /// <summary>
-    /// Resolves the current site identifier from the HTTP context using <see cref="EPiServer.Applications.IApplicationResolver"/>.
+    /// Resolves the current site identifier from the CMS application context.
     /// </summary>
     /// <returns>The site name, or <c>null</c> if the site cannot be resolved.</returns>
     private string? ResolveSiteId()
     {
-        var request = _httpContextAccessor.HttpContext?.RequestServices
-            .GetRequiredService<IApplicationResolver>();
-
-        return request?.GetByContext()?.Name;
+        return _applicationResolver.GetByContext()?.Name;
     }
 
     /// <inheritdoc />
-    public void SiteCreated(
-        object? sender,
-        ApplicationCreatedEvent e)
+    public void SiteCreated(Application application)
     {
-        if (sender == null)
+        if (GlobalSettingsRoot is not { } root)
         {
+            _logger.LogWarning("[Settings] Site {siteName} was created before the settings root was initialized", application.Name);
             return;
         }
 
         if (!_contentRepository
-                .GetChildren<SettingsFolder>(GlobalSettingsRoot)
-                .Any(x => x.Name.Equals(e.Application.Name, StringComparison.InvariantCultureIgnoreCase)))
+                .GetChildren<SettingsFolder>(root)
+                .Any(x => IsFolderForSite(x, application.Name)))
         {
-            CreateSiteFolder(e.Application);
+            EnsureSettings(CreateSiteFolder(application), application.Name);
         }
     }
 
     /// <inheritdoc />
-    public void SiteDeleted(
-        object? sender,
-        ApplicationDeletedEvent e)
+    public void SiteDeleted(Application application)
     {
-        if (sender == null)
+        if (GlobalSettingsRoot is not { } root)
         {
+            _logger.LogWarning("[Settings] Site {siteName} was deleted before the settings root was initialized", application.Name);
             return;
         }
 
         var folder = _contentRepository
-            .GetChildren<SettingsFolder>(GlobalSettingsRoot)
-            .FirstOrDefault(x => x.Name.Equals(e.Application.Name, StringComparison.InvariantCultureIgnoreCase));
+            .GetChildren<SettingsFolder>(root)
+            .FirstOrDefault(x => IsFolderForSite(x, application.Name));
 
         if (folder == null)
         {
@@ -64,36 +58,36 @@ public partial class SettingsService
     }
 
     /// <inheritdoc />
-    public void SiteUpdated(
-        object? sender,
-        ApplicationUpdatedEvent e)
+    public void SiteUpdated(Application application, Application previousApplication)
     {
-        if (sender == null)
+        if (GlobalSettingsRoot is not { } settingsRoot)
         {
+            _logger.LogWarning("[Settings] Site {siteName} was updated before the settings root was initialized", application.Name);
             return;
         }
 
-        if (e is not ApplicationUpdatedEvent updatedArgs)
+        if (string.Equals(application.Name, previousApplication.Name, StringComparison.OrdinalIgnoreCase))
         {
-            _logger.LogError("SiteUpdated fail as SiteDefinitionEventArgs is not of type SiteDefinitionUpdatedEventArgs");
             return;
         }
-
-        var prevSite = updatedArgs.PreviousApplication;
-        var updatedSite = updatedArgs.Application;
-        var settingsRoot = GlobalSettingsRoot;
 
         if (_contentRepository
-                .GetChildren<IContent>(settingsRoot)
-                .FirstOrDefault(x => x.Name.Equals(prevSite.Name, StringComparison.InvariantCultureIgnoreCase)) is ContentFolder currentSettingsFolder)
+                .GetChildren<SettingsFolder>(settingsRoot)
+                .FirstOrDefault(x => IsFolderForSite(x, previousApplication.Name)) is SettingsFolder currentSettingsFolder)
         {
-            var cloneFolder = currentSettingsFolder.CreateWritableClone();
-            cloneFolder.Name = updatedSite.Name;
+            var cloneFolder = (SettingsFolder)currentSettingsFolder.CreateWritableClone();
+            if (string.Equals(currentSettingsFolder.Name, previousApplication.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                cloneFolder.Name = application.Name;
+            }
+            cloneFolder.SiteId = application.Name;
             _contentRepository.Save(cloneFolder, SaveAction.Publish, AccessLevel.NoAccess);
         }
         else
         {
-            CreateSiteFolder(e.Application);
+            EnsureSettings(CreateSiteFolder(application), application.Name);
         }
+
+        ClearCache();
     }
 }

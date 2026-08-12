@@ -4,17 +4,17 @@ A plugin for [Optimizely CMS](https://www.optimizely.com/products/content-manage
 
 ## Features
 
-- **Per-site settings** — each site gets its own settings folder, created automatically when a site is added.
+- **Per-site settings** — each site gets its own settings folder, created automatically when a site is added and retained when its display name changes.
 - **Strongly-typed** — define settings as C# classes with property editors, just like regular Optimizely content.
 - **Multi-language** — settings respect language branches and fallback chains configured in the CMS.
 - **Edit & published mode** — draft settings are available in edit mode, published settings in default mode.
 - **CMS integration** — settings appear in the assets pane navigation tree and are searchable via the global search.
-- **Caching** — settings are cached per site/type/language with automatic invalidation on publish, save, move, and delete.
+- **Caching** — settings are cached per site/type/language with synchronized invalidation on content and language changes.
 
 ## Requirements
 
 - .NET 10+
-- Optimizely CMS 13+ (`EPiServer.CMS.UI.Core >= 13.0.0`)
+- Optimizely CMS 13.1+ (`EPiServer.CMS.UI.Core >= 13.1.1`)
 
 ## Installation
 
@@ -63,7 +63,7 @@ public class GeneralSettings
 }
 ```
 
-A settings instance is automatically created for each site when the site is first added.
+A settings instance is automatically created for each site. Startup reconciliation also creates instances for settings types added after a site already exists.
 
 ### 2. Retrieve settings in code
 
@@ -93,7 +93,7 @@ public class MyController(
 
 | Parameter  | Type      | Default | Description                                                          |
 | ---------- | --------- | ------- | -------------------------------------------------------------------- |
-| `siteId`   | `string?` | `null`  | Site identifier. Resolved from the current HTTP context when `null`. |
+| `siteId`   | `string?` | `null`  | Site identifier. Resolved from the current HTTP context when `null`; explicit values are case-insensitive and normalized to the CMS application name. Blank or unknown values return no settings. |
 | `language` | `string?` | `null`  | Language branch. Uses the preferred culture when `null`.             |
 
 ### 3. Edit settings in the CMS
@@ -102,13 +102,13 @@ Settings appear under the **Site Settings** navigation component in the CMS asse
 
 ## How it works
 
-1. **Initialization** — On application startup, the module registers a content root named `SettingsRoot` under the CMS root page. For each site returned by `IApplicationRepository`, a `SettingsFolder` is created (if missing), and default settings content is created for every type decorated with `[SettingsContentType]`.
+1. **Initialization** — On application startup, the module registers a content root named `SettingsRoot` under the CMS root page. It reconciles every site and every `[SettingsContentType]`, creating missing folders and settings content.
 
-2. **Caching** — Settings are cached in `ISynchronizedObjectInstanceCache` per site, content type, and language, with separate entries for published and draft modes. Cache is invalidated on content publish, save, move, delete, and language settings changes. Cache invalidation is synchronized across CDN nodes.
+2. **Caching** — Settings are cached in `ISynchronizedObjectInstanceCache` per site, content type, and language, with separate entries for published and draft modes. Draft saves invalidate only the local draft entry; published, language, and site lifecycle changes synchronize invalidation across nodes. Cache fills use bounded lock stripes to avoid duplicate work without globally serializing requests. Missing settings for an existing site use a one-minute negative cache; unknown site IDs are never cached.
 
-3. **Retrieval** — `GetSiteSettings<T>()` reads from cache, resolving language fallback chains from `IContentLanguageSettingsHandler`. In edit mode, draft (common draft) versions are returned; in default mode, published versions are returned.
+3. **Retrieval** — `GetSiteSettings<T>()` reads from cache, resolving language fallback chains from `IContentLanguageSettingsHandler`. In edit mode, a common draft is returned when available; otherwise the published version is used. Default mode returns the published version.
 
-4. **Site lifecycle** — The service listens for site created, deleted, and updated events to automatically create, remove, or rename settings folders.
+4. **Site lifecycle** — Typed CMS event subscribers create and permanently remove settings folders when sites change. On a site rename, a default folder label follows the site name while an editor-defined label is preserved; its hidden site identifier is always updated.
 
 ## Project structure
 
@@ -117,7 +117,7 @@ TuyenPham.SiteSettings/
 ├── Components/          # CMS navigation component
 ├── DependencyInjection/ # AddSiteSettings() extension method
 ├── Descriptors/         # Content repository descriptor
-├── Infrastructure/      # CMS initialization module
+├── Infrastructure/      # CMS initialization module and lifecycle event subscriber
 ├── Models/              # SettingsBase, SettingsContentTypeAttribute, SettingsFolder
 ├── Providers/           # Global search provider
 ├── Services/            # ISettingsService and SettingsService

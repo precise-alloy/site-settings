@@ -9,7 +9,6 @@ using EPiServer.Framework.TypeScanner;
 using EPiServer.Globalization;
 using EPiServer.Security;
 using EPiServer.Web;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using TuyenPham.SiteSettings.Models;
 
@@ -26,7 +25,7 @@ public partial class SettingsService(
     IContentTypeRepository contentTypeRepository,
     IContentVersionRepository contentVersionRepository,
     IContextModeResolver contextModeResolver,
-    IHttpContextAccessor httpContextAccessor,
+    IApplicationResolver applicationResolver,
     ILogger<SettingsService> logger,
     IApplicationRepository applicationRepository,
     ISynchronizedObjectInstanceCache cacheManager,
@@ -36,6 +35,7 @@ public partial class SettingsService(
 {
     private const string SettingServicesMasterCacheKey = "TuyenPham-SiteSettings";
     private const string LanguageSettingsCacheKey = "TuyenPham-SiteSettings-LanguageSettings";
+    private static readonly object[] CachePopulationLocks = Enumerable.Range(0, 32).Select(_ => new object()).ToArray();
 
     private readonly IContentEvents _contentEvents = contentEvents;
     private readonly IContentLanguageSettingsHandler _contentLanguageSettingsHandler = contentLanguageSettingsHandler;
@@ -43,34 +43,82 @@ public partial class SettingsService(
     private readonly IContentTypeRepository _contentTypeRepository = contentTypeRepository;
     private readonly IContentVersionRepository _contentVersionRepository = contentVersionRepository;
     private readonly IContextModeResolver _contextModeResolver = contextModeResolver;
-    private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+    private readonly IApplicationResolver _applicationResolver = applicationResolver;
     private readonly ILogger<SettingsService> _logger = logger;
     private readonly IApplicationRepository _applicationRepository = applicationRepository;
     private readonly ISynchronizedObjectInstanceCache _cacheManager = cacheManager;
     private readonly ITypeScannerLookup _typeScannerLookup = typeScannerLookup;
     private readonly ContentRootService _contentRootService = contentRootService;
+    private readonly object _initializationLock = new();
+    private bool _initialized;
     /// <inheritdoc />
     public ContentReference? GlobalSettingsRoot { get; set; }
 
     /// <inheritdoc />
     public void InitializeSettings()
     {
+        lock (_initializationLock)
+        {
+            if (_initialized)
+            {
+                return;
+            }
+
+            RegisterContentRoots();
+            _contentEvents.PublishedContent += PublishedContent;
+            _contentEvents.SavedContent += SavedContent;
+            _contentEvents.MovedContent += MovedContent;
+            _contentEvents.DeletedContentLanguage += DeletedContentLanguage;
+            ContentLanguageSettingRepository.ContentLanguageSettingDeleted += ContentLanguageSettingSavedOrDeleted;
+            ContentLanguageSettingRepository.ContentLanguageSettingSaved += ContentLanguageSettingSavedOrDeleted;
+            _initialized = true;
+        }
+    }
+
+    /// <inheritdoc />
+    public void UninitializeSettings()
+    {
+        lock (_initializationLock)
+        {
+            if (!_initialized)
+            {
+                return;
+            }
+
+            _contentEvents.PublishedContent -= PublishedContent;
+            _contentEvents.SavedContent -= SavedContent;
+            _contentEvents.MovedContent -= MovedContent;
+            _contentEvents.DeletedContentLanguage -= DeletedContentLanguage;
+            ContentLanguageSettingRepository.ContentLanguageSettingDeleted -= ContentLanguageSettingSavedOrDeleted;
+            ContentLanguageSettingRepository.ContentLanguageSettingSaved -= ContentLanguageSettingSavedOrDeleted;
+            _initialized = false;
+        }
+    }
+
+    private void RegisterContentRoots()
+    {
         try
         {
-            RegisterContentRoots();
+            var registeredRoots = _contentRepository.GetItems(_contentRootService.List(), new LoaderOptions());
+            var settingsRootRegistered = registeredRoots
+                .Any(x => x.ContentGuid == SettingsFolder.SettingsRootGuid
+                          && x.Name.Equals(SettingsFolder.SettingsRootName));
+
+            if (!settingsRootRegistered)
+            {
+                _contentRootService.Register<SettingsFolder>(
+                    SettingsFolder.SettingsRootName,
+                    SettingsFolder.SettingsRootGuid,
+                    ContentReference.RootPage);
+            }
+
+            UpdateSettings();
         }
         catch (NotSupportedException notSupportedException)
         {
             _logger.LogError(notSupportedException, "[Settings] {message}", notSupportedException.Message);
             throw;
         }
-
-        ContentLanguageSettingRepository.ContentLanguageSettingDeleted += ContentLanguageSettingSavedOrDeleted;
-        ContentLanguageSettingRepository.ContentLanguageSettingSaved += ContentLanguageSettingSavedOrDeleted;
-        _contentEvents.PublishedContent += PublishedContent;
-        _contentEvents.SavedContent += SavedContent;
-        _contentEvents.MovedContent += MovedContent;
-        _contentEvents.DeletedContentLanguage += DeletedContentLanguage;
     }
 
     /// <summary>
@@ -93,30 +141,10 @@ public partial class SettingsService(
         var children = _contentRepository.GetChildren<SettingsFolder>(GlobalSettingsRoot).ToList();
         foreach (var site in _applicationRepository.List())
         {
-            var folder = children.Find(x => x.Name.Equals(site.Name, StringComparison.InvariantCultureIgnoreCase));
+            var folder = children.Find(x => IsFolderForSite(x, site.Name));
 
-            if (folder != null)
-            {
-                var settingsTypes = new List<Type>();
-                foreach (var child in _contentRepository.GetChildren<SettingsBase>(folder.ContentLink,
-                             [LanguageLoaderOption.MasterLanguage()]))
-                {
-                    var settingType = child.GetOriginalType();
-                    if (settingsTypes.Contains(settingType))
-                    {
-                        _logger.LogWarning("[Settings] Setting of type {settingTypeName} for site {folderName} have more than one instance", settingType.Name, folder.Name);
-                    }
-                    else
-                    {
-                        settingsTypes.Add(settingType);
-                    }
-                    RepopulateCacheForAllLanguage(site.Name, child);
-                }
-            }
-            else
-            {
-                CreateSiteFolder(site);
-            }
+            folder ??= CreateSiteFolder(site);
+            EnsureSettings(folder, site.Name);
         }
     }
 
@@ -127,20 +155,26 @@ public partial class SettingsService(
         where T : SettingsBase
     {
         var contentType = typeof(T);
-        if (contentType.IsInterface)
-        {
-            var registerType = ServiceLocator.Current.GetInstance<T>();
-            contentType = registerType.GetType();
-        }
         var contentLanguage = language ?? ContentLanguage.PreferredCulture.Name;
         if (siteId is null)
         {
             siteId = ResolveSiteId();
-            if (siteId is null)
-            {
-                return default;
-            }
         }
+
+        if (string.IsNullOrWhiteSpace(siteId))
+        {
+            return default;
+        }
+
+        var application = _applicationRepository.Get(siteId);
+        if (application is null)
+        {
+            return default;
+        }
+
+        // Application.Name is the canonical cache and invalidation identity for a case-insensitive site lookup.
+        siteId = application.Name;
+
         try
         {
             var settings = GetSettingFromCache(
@@ -172,27 +206,6 @@ public partial class SettingsService(
     }
 
     /// <summary>
-    /// Registers the settings root in the content root service if not already registered, then calls <see cref="UpdateSettings"/>.
-    /// </summary>
-    private void RegisterContentRoots()
-    {
-        var registeredRoots = _contentRepository.GetItems(_contentRootService.List(), new LoaderOptions());
-        var settingsRootRegistered = registeredRoots
-            .Any(x => x.ContentGuid == SettingsFolder.SettingsRootGuid
-                      && x.Name.Equals(SettingsFolder.SettingsRootName));
-
-        if (!settingsRootRegistered)
-        {
-            _contentRootService.Register<SettingsFolder>(
-                SettingsFolder.SettingsRootName,
-                SettingsFolder.SettingsRootGuid,
-                ContentReference.RootPage);
-        }
-
-        UpdateSettings();
-    }
-
-    /// <summary>
     /// Retrieves cached settings for the specified site and type. If the cache is empty, repopulates it.
     /// </summary>
     /// <param name="siteId">The site identifier.</param>
@@ -201,22 +214,28 @@ public partial class SettingsService(
     /// <returns>A dictionary of language branch to settings instance.</returns>
     private Dictionary<string, SettingsBase?> GetSettingFromCache(string siteId, Type type, bool isEditMod)
     {
-        //If cache cleared
-        if (_cacheManager.Get(CreateCacheKey(siteId, type, isEditMod)) is Dictionary<string, SettingsBase?>
-            settingsOfType)
+        var cacheKey = CreateCacheKey(siteId, type, isEditMod);
+        if (_cacheManager.Get(cacheKey) is Dictionary<string, SettingsBase?> settingsOfType)
         {
             return settingsOfType;
         }
 
-        if (!RepopulateCacheForAllLanguage(siteId, type))
+        // A bounded, mode-agnostic stripe prevents duplicate paired fills without serializing every site and type.
+        lock (GetCachePopulationLock(siteId, type))
         {
-            InsertSettingToCache(siteId, type, false, new Dictionary<string, SettingsBase?>());
-            InsertSettingToCache(siteId, type, true, new Dictionary<string, SettingsBase?>());
-            _logger.LogWarning("[Settings] no setting available for type {type} in site {siteId}", type, siteId);
-        }
+            if (_cacheManager.Get(cacheKey) is Dictionary<string, SettingsBase?> cachedSettings)
+            {
+                return cachedSettings;
+            }
 
-        return _cacheManager.Get(CreateCacheKey(siteId, type, isEditMod)) as Dictionary<string, SettingsBase?>
-               ?? [];
+            if (!RepopulateCacheForAllLanguage(siteId, type))
+            {
+                _logger.LogWarning("[Settings] no setting available for type {type} in site {siteId}", type, siteId);
+                return CacheMissingSettings(siteId, type);
+            }
+
+            return _cacheManager.Get(CreateCacheKey(siteId, type, isEditMod)) as Dictionary<string, SettingsBase?> ?? [];
+        }
 
     }
 
@@ -229,23 +248,16 @@ public partial class SettingsService(
     private bool RepopulateCacheForAllLanguage(string siteId, Type type)
     {
         var root = _contentRepository.GetItems(_contentRootService.List(), new LoaderOptions())
-            .FirstOrDefault(x => x.ContentGuid == SettingsFolder.SettingsRootGuid)
-                   ?? _contentRepository.Get<IContent>(SettingsFolder.SettingsRootGuid);
+            .FirstOrDefault(x => x.ContentGuid == SettingsFolder.SettingsRootGuid);
         if (root == null)
         {
             _logger.LogWarning("[Settings] Setting root is NULL");
             return false;
         }
 
-        var site = _applicationRepository.Get(siteId);
-        if (site == null)
-        {
-            return false;
-        }
-
         var folder = _contentRepository
             .GetChildren<SettingsFolder>(root.ContentLink)
-            .FirstOrDefault(x => x.Name.Equals(site.Name, StringComparison.InvariantCultureIgnoreCase));
+            .FirstOrDefault(x => IsFolderForSite(x, siteId));
 
         if (folder == null)
         {
@@ -323,6 +335,26 @@ public partial class SettingsService(
                 [SettingServicesMasterCacheKey]));
     }
 
+    private Dictionary<string, SettingsBase?> CacheMissingSettings(string siteId, Type type)
+    {
+        _cacheManager.Insert(
+            CreateCacheKey(siteId, type, false),
+            new Dictionary<string, SettingsBase?>(),
+            CreateCacheEvictionPolicy(TimeSpan.FromMinutes(1)));
+        _cacheManager.Insert(
+            CreateCacheKey(siteId, type, true),
+            new Dictionary<string, SettingsBase?>(),
+            CreateCacheEvictionPolicy(TimeSpan.FromMinutes(1)));
+
+        return [];
+    }
+
+    private static CacheEvictionPolicy CreateCacheEvictionPolicy(TimeSpan timeout) => new(
+        timeout,
+        CacheTimeoutType.Absolute,
+        Enumerable.Empty<string>(),
+        [SettingServicesMasterCacheKey]);
+
     /// <summary>
     /// Removes both published and draft cache entries for the specified settings type and site.
     /// </summary>
@@ -390,51 +422,78 @@ public partial class SettingsService(
     }
 
     /// <summary>
-    /// Creates a new settings folder for the given site and populates it with default instances of all registered settings types.
+    /// Creates a new settings folder for the given site. <see cref="EnsureSettings"/> provisions its settings content.
     /// </summary>
     /// <param name="siteDefinition">The application (site) to create a settings folder for.</param>
-    private void CreateSiteFolder(Application siteDefinition)
+    private SettingsFolder CreateSiteFolder(Application siteDefinition)
     {
-        var site = siteDefinition as Website;
-        var folder = _contentRepository.GetDefault<SettingsFolder>(GlobalSettingsRoot);
+        var folder = _contentRepository.GetDefault<SettingsFolder>(GlobalSettingsRoot!);
         folder.Name = siteDefinition.Name;
+        folder.SiteId = siteDefinition.Name;
         var reference = _contentRepository.Save(folder, SaveAction.Publish, AccessLevel.NoAccess);
 
-        var settingsModelTypes = _typeScannerLookup
-            .AllTypes
-            .Where(t => t.GetCustomAttributes(typeof(SettingsContentTypeAttribute), false).Length > 0);
+        return _contentRepository.Get<SettingsFolder>(reference);
+    }
 
-        foreach (var settingsType in settingsModelTypes)
+    private void EnsureSettings(SettingsFolder folder, string siteId)
+    {
+        if (string.IsNullOrWhiteSpace(folder.SiteId))
         {
-            if (!(settingsType.GetCustomAttributes(typeof(SettingsContentTypeAttribute), false)
-                    .FirstOrDefault() is SettingsContentTypeAttribute attribute))
+            var writableFolder = folder.CreateWritableClone() as SettingsFolder;
+            if (writableFolder != null)
+            {
+                writableFolder.SiteId = siteId;
+                _contentRepository.Save(writableFolder, SaveAction.Publish, AccessLevel.NoAccess);
+            }
+        }
+
+        var existingSettings = _contentRepository.GetChildren<SettingsBase>(
+            folder.ContentLink,
+            [LanguageLoaderOption.MasterLanguage()]).ToList();
+        foreach (var duplicateGroup in existingSettings.GroupBy(x => x.GetOriginalType()).Where(x => x.Count() > 1))
+        {
+            _logger.LogWarning(
+                "[Settings] Setting type {settingTypeName} has {count} instances for site {siteId}",
+                duplicateGroup.Key.Name,
+                duplicateGroup.Count(),
+                siteId);
+        }
+        var existingTypes = existingSettings.Select(x => x.GetOriginalType()).ToHashSet();
+        foreach (var settings in existingSettings)
+        {
+            RepopulateCacheForAllLanguage(siteId, settings);
+        }
+
+        foreach (var settingsType in GetSettingsTypes().Where(x => !existingTypes.Contains(x)))
+        {
+            var attribute = settingsType.GetCustomAttributes(typeof(SettingsContentTypeAttribute), false)
+                .OfType<SettingsContentTypeAttribute>()
+                .Single();
+
+            var contentType = _contentTypeRepository.Load(settingsType);
+            var newSettings = _contentRepository.GetDefault<IContent>(folder.ContentLink, contentType.ID);
+            newSettings.Name = attribute.DisplayName;
+            _contentRepository.Save(newSettings, SaveAction.Publish, AccessLevel.NoAccess);
+        }
+    }
+
+    private IEnumerable<Type> GetSettingsTypes()
+    {
+        foreach (var type in _typeScannerLookup.AllTypes)
+        {
+            var isSettingsType = type.GetCustomAttributes(typeof(SettingsContentTypeAttribute), false).Length > 0;
+            if (!isSettingsType || type.IsAbstract)
             {
                 continue;
             }
 
-            var contentType = _contentTypeRepository.Load(settingsType);
+            if (!typeof(SettingsBase).IsAssignableFrom(type))
+            {
+                _logger.LogWarning("[Settings] Type {settingsTypeName} uses SettingsContentTypeAttribute but does not inherit SettingsBase", type.FullName);
+                continue;
+            }
 
-            var newSettings = _contentRepository.GetDefault<IContent>(reference, contentType.ID);
-            newSettings.Name = attribute.DisplayName;
-            _contentRepository.Save(newSettings, SaveAction.Publish, AccessLevel.NoAccess);
-
-            InsertSettingToCache(
-                siteDefinition.Name,
-                newSettings.GetOriginalType(),
-                false,
-                new Dictionary<string, SettingsBase?>
-                {
-                    [newSettings.LanguageBranch()] = newSettings as SettingsBase
-                });
-
-            InsertSettingToCache(
-                siteDefinition.Name,
-                newSettings.GetOriginalType(),
-                true,
-                new Dictionary<string, SettingsBase?>
-                {
-                    [newSettings.LanguageBranch()] = newSettings as SettingsBase
-                });
+            yield return type;
         }
     }
 
@@ -458,4 +517,16 @@ public partial class SettingsService(
     /// <param name="settingsRef">The content reference of the settings item.</param>
     /// <returns>The computed language settings cache key string.</returns>
     private static string CreateLanguageSettingsCacheKey(ContentReference settingsRef) => $"{LanguageSettingsCacheKey}-LanguageSettingsOf-{settingsRef.ID}";
+
+    private static bool IsFolderForSite(SettingsFolder folder, string siteId) =>
+        string.Equals(
+            string.IsNullOrWhiteSpace(folder.SiteId) ? folder.Name : folder.SiteId,
+            siteId,
+            StringComparison.OrdinalIgnoreCase);
+
+    private static object GetCachePopulationLock(string siteId, Type type)
+    {
+        var key = HashCode.Combine(StringComparer.Ordinal.GetHashCode(siteId), type);
+        return CachePopulationLocks[(key & int.MaxValue) % CachePopulationLocks.Length];
+    }
 }

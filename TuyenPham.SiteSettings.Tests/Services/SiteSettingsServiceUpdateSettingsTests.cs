@@ -7,6 +7,9 @@ namespace TuyenPham.SiteSettings.Tests.Services;
 
 public class SettingsServiceUpdateSettingsTests : SettingsServiceTestBase
 {
+    [SettingsContentType]
+    private sealed class AddedSettings : SettingsBase;
+
     [Fact]
     public void UpdateSettings_WhenRootIsNull_LogsWarningAndReturns()
     {
@@ -72,9 +75,74 @@ public class SettingsServiceUpdateSettingsTests : SettingsServiceTestBase
         ContentRepository
             .Save(Arg.Any<IContent>(), Arg.Any<EPiServer.DataAccess.SaveAction>(), Arg.Any<EPiServer.Security.AccessLevel>())
             .Returns(CreateContentReference(20));
+        ContentRepository
+            .Get<SettingsFolder>(Arg.Any<ContentReference>())
+            .Returns(new SettingsFolder());
 
         service.UpdateSettings();
 
         ContentRepository.Received().GetDefault<SettingsFolder>(Arg.Any<ContentReference>());
+    }
+
+    [Fact]
+    public void UpdateSettings_WhenSettingsTypeIsAdded_ProvisionsExistingSiteFolder()
+    {
+        var service = CreateService();
+        var rootRef = CreateContentReference(10);
+        var folderRef = CreateContentReference(20);
+        var root = Substitute.For<IContent>();
+        root.ContentGuid.Returns(SettingsFolder.SettingsRootGuid);
+        root.ContentLink.Returns(rootRef);
+        var folder = Substitute.For<SettingsFolder>();
+        folder.Name.Returns("MySite");
+        folder.SiteId.Returns("MySite");
+        folder.ContentLink.Returns(folderRef);
+        var site = CreateWebsite("MySite");
+        var contentType = Substitute.For<ContentType>();
+        var settings = Substitute.For<IContent>();
+
+        ContentRootService.List().Returns([rootRef]);
+        ContentRepository
+            .GetItems(Arg.Any<IEnumerable<ContentReference>>(), Arg.Any<LoaderOptions>())
+            .Returns([root]);
+        ContentRepository.GetChildren<SettingsFolder>(rootRef).Returns([folder]);
+        ContentRepository
+            .GetChildren<SettingsBase>(folderRef, Arg.Any<LoaderOptions>())
+            .Returns([]);
+        ApplicationRepository.List().Returns([site]);
+        TypeScannerLookup.AllTypes.Returns([typeof(AddedSettings)]);
+        ContentTypeRepository.Load(typeof(AddedSettings)).Returns(contentType);
+        ContentRepository
+            .GetDefault<IContent>(folderRef, Arg.Any<int>())
+            .Returns(settings);
+
+        service.UpdateSettings();
+
+        ContentRepository.Received().Save(settings, EPiServer.DataAccess.SaveAction.Publish, EPiServer.Security.AccessLevel.NoAccess);
+    }
+
+    [Fact]
+    public void UpdateSettings_WhenFolderWasRenamed_UsesItsSiteIdInsteadOfCreatingDuplicate()
+    {
+        var service = CreateService();
+        var rootRef = CreateContentReference(10);
+        var root = Substitute.For<IContent>();
+        root.ContentGuid.Returns(SettingsFolder.SettingsRootGuid);
+        root.ContentLink.Returns(rootRef);
+        var folder = Substitute.For<SettingsFolder>();
+        folder.Name.Returns("Custom settings");
+        folder.SiteId.Returns("MySite");
+        folder.ContentLink.Returns(CreateContentReference(20));
+
+        ContentRootService.List().Returns([rootRef]);
+        ContentRepository.GetItems(Arg.Any<IEnumerable<ContentReference>>(), Arg.Any<LoaderOptions>()).Returns([root]);
+        ContentRepository.GetChildren<SettingsFolder>(rootRef).Returns([folder]);
+        ContentRepository.GetChildren<SettingsBase>(folder.ContentLink, Arg.Any<LoaderOptions>()).Returns([]);
+        ApplicationRepository.List().Returns([CreateWebsite("MySite")]);
+        TypeScannerLookup.AllTypes.Returns([]);
+
+        service.UpdateSettings();
+
+        ContentRepository.DidNotReceive().GetDefault<SettingsFolder>(Arg.Any<ContentReference>());
     }
 }

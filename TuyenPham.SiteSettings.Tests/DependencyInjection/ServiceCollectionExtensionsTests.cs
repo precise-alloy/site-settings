@@ -1,4 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using EPiServer.Applications;
+using EPiServer.Events;
+using TuyenPham.SiteSettings.Infrastructure;
 using TuyenPham.SiteSettings.DependencyInjection;
 using TuyenPham.SiteSettings.Services;
 
@@ -41,7 +44,7 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddSiteSettings_CalledMultipleTimes_RegistersMultipleDescriptors()
+    public void AddSiteSettings_CalledMultipleTimes_RegistersOneService()
     {
         var services = new ServiceCollection();
 
@@ -49,6 +52,21 @@ public class ServiceCollectionExtensionsTests
         services.AddSiteSettings();
 
         var descriptors = services.Where(d => d.ServiceType == typeof(ISettingsService)).ToList();
-        Assert.Equal(2, descriptors.Count);
+        Assert.Single(descriptors);
+    }
+
+    [Theory]
+    [InlineData(typeof(ApplicationCreatedEvent))]
+    [InlineData(typeof(ApplicationDeletedEvent))]
+    [InlineData(typeof(ApplicationUpdatedEvent))]
+    public void AddSiteSettings_RegistersLifecycleEventSubscriber(Type eventType)
+    {
+        var services = new ServiceCollection();
+
+        services.AddSiteSettings();
+
+        var subscriberType = typeof(IEventSubscriber<>).MakeGenericType(eventType);
+        var descriptor = Assert.Single(services, x => x.ServiceType == subscriberType);
+        Assert.Equal(typeof(SettingsEventSubscriber), descriptor.ImplementationType);
     }
 }

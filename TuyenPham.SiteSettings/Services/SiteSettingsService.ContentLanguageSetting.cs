@@ -5,25 +5,25 @@ namespace TuyenPham.SiteSettings.Services;
 public partial class SettingsService
 {
     /// <summary>
-    /// Handles language setting saved or deleted events. Clears the entire settings cache when
-    /// the root page or a settings content item has its language settings modified.
+    /// Clears settings caches when fallback configuration for the root page or settings content changes.
     /// </summary>
-    /// <param name="sender">The event source.</param>
-    /// <param name="e">The event arguments containing the affected content link.</param>
-    private void ContentLanguageSettingSavedOrDeleted(
-        object? sender,
-        ContentLanguageSettingEventArgs? e)
+    /// <param name="contentLink">The content whose language settings changed.</param>
+    internal void ContentLanguageSettingsChanged(ContentReference contentLink)
     {
-        if (sender == null
-            || e == null)
-        {
-            return;
-        }
-
-        if (e.ContentLink == ContentReference.RootPage
-            || _contentRepository.TryGet(e.ContentLink, out SettingsBase _))
+        if (contentLink == ContentReference.RootPage
+            || _contentRepository.TryGet(contentLink, out SettingsBase _))
         {
             ClearCache();
+        }
+    }
+
+    private void ContentLanguageSettingSavedOrDeleted(
+        object? sender,
+        ContentLanguageSettingEventArgs? eventArgs)
+    {
+        if (eventArgs != null)
+        {
+            ContentLanguageSettingsChanged(eventArgs.ContentLink);
         }
     }
 }

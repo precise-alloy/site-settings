@@ -1,4 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using EPiServer.Applications;
+using EPiServer.DependencyInjection;
+using TuyenPham.SiteSettings.Infrastructure;
 using TuyenPham.SiteSettings.Services;
 
 namespace TuyenPham.SiteSettings.DependencyInjection;
@@ -16,7 +20,10 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddSiteSettings(
         this IServiceCollection services)
     {
-        services.AddSingleton<ISettingsService, SettingsService>();
+        services.TryAddSingleton<ISettingsService, SettingsService>();
+        services.AddCmsEventSubscriber<ApplicationCreatedEvent, SettingsEventSubscriber>();
+        services.AddCmsEventSubscriber<ApplicationDeletedEvent, SettingsEventSubscriber>();
+        services.AddCmsEventSubscriber<ApplicationUpdatedEvent, SettingsEventSubscriber>();
 
         return services;
     }

@@ -5,7 +5,6 @@ using EPiServer.DataAbstraction;
 using EPiServer.Framework.Cache;
 using EPiServer.Framework.TypeScanner;
 using EPiServer.Web;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using TuyenPham.SiteSettings.Services;
@@ -20,7 +19,7 @@ public class SettingsServiceTestBase
     protected readonly IContentTypeRepository ContentTypeRepository = Substitute.For<IContentTypeRepository>();
     protected readonly IContentVersionRepository ContentVersionRepository = Substitute.For<IContentVersionRepository>();
     protected readonly IContextModeResolver ContextModeResolver = Substitute.For<IContextModeResolver>();
-    protected readonly IHttpContextAccessor HttpContextAccessor = Substitute.For<IHttpContextAccessor>();
+    protected readonly IApplicationResolver ApplicationResolver = Substitute.For<IApplicationResolver>();
     protected readonly ILogger<SettingsService> Logger = Substitute.For<ILogger<SettingsService>>();
     protected readonly IApplicationRepository ApplicationRepository = Substitute.For<IApplicationRepository>();
     protected readonly ISynchronizedObjectInstanceCache CacheManager = Substitute.For<ISynchronizedObjectInstanceCache>();
@@ -35,7 +34,7 @@ public class SettingsServiceTestBase
             ContentTypeRepository,
             ContentVersionRepository,
             ContextModeResolver,
-            HttpContextAccessor,
+            ApplicationResolver,
             Logger,
             ApplicationRepository,
             CacheManager,

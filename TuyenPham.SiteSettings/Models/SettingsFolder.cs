@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TuyenPham.SiteSettings.Models;
 
 /// <summary>
@@ -11,6 +13,12 @@ namespace TuyenPham.SiteSettings.Models;
 public class SettingsFolder
     : ContentFolder
 {
+    /// <summary>
+    /// Gets or sets the immutable site identifier this folder belongs to.
+    /// </summary>
+    [ScaffoldColumn(false)]
+    public virtual string? SiteId { get; set; }
+
     /// <summary>
     /// The registered name of the settings root content node.
     /// </summary>

@@ -49,17 +49,18 @@ public class SettingsInitializationTests
     }
 
     [Fact]
-    public void Uninitialize_DoesNotThrow()
+    public void Uninitialize_WhenContextIsNull_ThrowsArgumentNullException()
     {
         IInitializableModule module = new SettingsInitialization();
 
-        try
-        {
-            module.Uninitialize(null!);
-        }
-        catch
-        {
-            Assert.Fail("Uninitialize should not throw");
-        }
+        Assert.Throws<ArgumentNullException>(() => module.Uninitialize(null!));
+    }
+
+    [Fact]
+    public void Initialize_WhenContextIsNull_ThrowsArgumentNullException()
+    {
+        IInitializableModule module = new SettingsInitialization();
+
+        Assert.Throws<ArgumentNullException>(() => module.Initialize(null!));
     }
 }

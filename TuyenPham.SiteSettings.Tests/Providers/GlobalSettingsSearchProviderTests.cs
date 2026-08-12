@@ -93,18 +93,33 @@ public class GlobalSettingsSearchProviderTests
     }
 
     [Fact]
+    public void Search_WhenSettingsRootIsUnavailable_ReturnsEmpty()
+    {
+        var provider = CreateProvider();
+        _settingsService.GlobalSettingsRoot.Returns((ContentReference?)null);
+
+        var results = provider.Search(new Query("") { SearchQuery = "settings" });
+
+        Assert.Empty(results);
+        _contentLoader.DidNotReceive().GetChildren<SettingsFolder>(Arg.Any<ContentReference>());
+    }
+
+    [Fact]
     public void Search_WhenNoSettingsMatch_ReturnsEmpty()
     {
         var provider = CreateProvider();
         var rootRef = new ContentReference(10);
         _settingsService.GlobalSettingsRoot.Returns(rootRef);
 
-        var setting = Substitute.For<SettingsBase>();
-        setting.Name.Returns("GeneralSettings");
+        var folder = Substitute.For<SettingsFolder>();
+        folder.ContentLink.Returns(new ContentReference(11));
 
         _contentLoader
-            .GetChildren<SettingsBase>(rootRef)
-            .Returns([setting]);
+            .GetChildren<SettingsFolder>(rootRef)
+            .Returns([folder]);
+        _contentLoader
+            .GetChildren<SettingsBase>(folder.ContentLink)
+            .Returns([]);
 
         var query = new Query("") { SearchQuery = "nonexistent" };
 
@@ -120,11 +135,16 @@ public class GlobalSettingsSearchProviderTests
         var rootRef = new ContentReference(10);
         _settingsService.GlobalSettingsRoot.Returns(rootRef);
 
+        var folder = Substitute.For<SettingsFolder>();
+        folder.ContentLink.Returns(new ContentReference(11));
         var setting = Substitute.For<SettingsBase>();
         setting.Name.Returns("GeneralSettings");
 
         _contentLoader
-            .GetChildren<SettingsBase>(rootRef)
+            .GetChildren<SettingsFolder>(rootRef)
+            .Returns([folder]);
+        _contentLoader
+            .GetChildren<SettingsBase>(folder.ContentLink)
             .Returns([setting]);
 
         // Search with matching query - verifies the filtering logic reaches the matching item.
@@ -140,7 +160,8 @@ public class GlobalSettingsSearchProviderTests
             // Expected: CreateSearchResult invokes framework internals that are not mockable.
         }
 
-        _contentLoader.Received().GetChildren<SettingsBase>(rootRef);
+        _contentLoader.Received().GetChildren<SettingsFolder>(rootRef);
+        _contentLoader.Received().GetChildren<SettingsBase>(folder.ContentLink);
     }
 
     [Fact]
@@ -151,6 +172,8 @@ public class GlobalSettingsSearchProviderTests
         _settingsService.GlobalSettingsRoot.Returns(rootRef);
 
         // Create more items than MaxResults to verify capping
+        var folder = Substitute.For<SettingsFolder>();
+        folder.ContentLink.Returns(new ContentReference(11));
         var settings = Enumerable.Range(1, 5).Select(i =>
         {
             var s = Substitute.For<SettingsBase>();
@@ -161,12 +184,15 @@ public class GlobalSettingsSearchProviderTests
         }).ToArray();
 
         _contentLoader
-            .GetChildren<SettingsBase>(rootRef)
+            .GetChildren<SettingsFolder>(rootRef)
+            .Returns([folder]);
+        _contentLoader
+            .GetChildren<SettingsBase>(folder.ContentLink)
             .Returns(settings);
 
         var query = new Query("") { SearchQuery = "Setting", MaxResults = 2 };
 
-        _contentLoader.Received(0).GetChildren<SettingsBase>(rootRef);
+        _contentLoader.Received(0).GetChildren<SettingsFolder>(rootRef);
 
         try
         {
@@ -177,7 +203,8 @@ public class GlobalSettingsSearchProviderTests
             // Expected: CreateSearchResult invokes framework internals that are not mockable.
         }
 
-        _contentLoader.Received(1).GetChildren<SettingsBase>(rootRef);
+        _contentLoader.Received(1).GetChildren<SettingsFolder>(rootRef);
+        _contentLoader.Received().GetChildren<SettingsBase>(folder.ContentLink);
     }
 
     [Fact]
@@ -187,11 +214,16 @@ public class GlobalSettingsSearchProviderTests
         var rootRef = new ContentReference(10);
         _settingsService.GlobalSettingsRoot.Returns(rootRef);
 
+        var folder = Substitute.For<SettingsFolder>();
+        folder.ContentLink.Returns(new ContentReference(11));
         var setting = Substitute.For<SettingsBase>();
         setting.Name.Returns("GeneralSettings");
 
         _contentLoader
-            .GetChildren<SettingsBase>(rootRef)
+            .GetChildren<SettingsFolder>(rootRef)
+            .Returns([folder]);
+        _contentLoader
+            .GetChildren<SettingsBase>(folder.ContentLink)
             .Returns([setting]);
 
         // Verify case-insensitive matching reaches the content loader with a lowercase query.
@@ -206,7 +238,8 @@ public class GlobalSettingsSearchProviderTests
             // Expected: CreateSearchResult invokes framework internals that are not mockable.
         }
 
-        _contentLoader.Received().GetChildren<SettingsBase>(rootRef);
+        _contentLoader.Received().GetChildren<SettingsFolder>(rootRef);
+        _contentLoader.Received().GetChildren<SettingsBase>(folder.ContentLink);
     }
 
     [Fact]

@@ -22,29 +22,33 @@ public interface ISettingsService
     /// Retrieves the settings of the specified type for a given site and language.
     /// </summary>
     /// <typeparam name="T">The settings content type, which must derive from <see cref="SettingsBase"/>.</typeparam>
-    /// <param name="siteId">The site identifier. If <c>null</c>, the current site is resolved from the HTTP context.</param>
+    /// <param name="siteId">The site identifier. If <c>null</c>, the current CMS application is used. Values are resolved case-insensitively and normalized to the CMS application name; blank or unknown values return <c>null</c>.</param>
     /// <param name="language">The language branch. If <c>null</c>, the preferred culture is used.</param>
     /// <returns>The settings instance, or <c>null</c> if not found.</returns>
     T? GetSiteSettings<T>(string? siteId = null, string? language = null) where T : SettingsBase;
 
     /// <summary>
-    /// Handles the site created event by creating a settings folder and default settings for the new site.
+    /// Removes local content-event subscriptions during CMS shutdown.
     /// </summary>
-    /// <param name="sender">The event source.</param>
-    /// <param name="e">The event arguments containing the created application.</param>
-    void SiteCreated(object? sender, ApplicationCreatedEvent e);
+    void UninitializeSettings();
 
     /// <summary>
-    /// Handles the site deleted event by removing the corresponding settings folder and clearing the cache.
+    /// Applies a site creation event.
     /// </summary>
-    /// <param name="sender">The event source.</param>
-    /// <param name="e">The event arguments containing the deleted application.</param>
-    void SiteDeleted(object? sender, ApplicationDeletedEvent e);
+    /// <param name="application">The newly created CMS application.</param>
+    void SiteCreated(Application application);
 
     /// <summary>
-    /// Handles the site updated event by renaming the settings folder or creating one if it doesn't exist.
+    /// Applies a site deletion event by permanently removing the corresponding settings folder.
     /// </summary>
-    /// <param name="sender">The event source.</param>
-    /// <param name="e">The event arguments containing the previous and updated application details.</param>
-    void SiteUpdated(object? sender, ApplicationUpdatedEvent e);
+    /// <param name="application">The deleted CMS application.</param>
+    void SiteDeleted(Application application);
+
+    /// <summary>
+    /// Applies a site rename or update event.
+    /// </summary>
+    /// <param name="application">The current CMS application.</param>
+    /// <param name="previousApplication">The application state before the update.</param>
+    void SiteUpdated(Application application, Application previousApplication);
+
 }
